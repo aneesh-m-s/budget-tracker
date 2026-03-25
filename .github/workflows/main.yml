@@ -8,6 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+      TOKEN: ${{ secrets.TOKEN }}
+
     steps:
     - uses: actions/checkout@v3
 
@@ -19,3 +23,11 @@ jobs:
 
     - name: Build Docker Image
       run: docker build -t budget-app .
+
+    - name: Scan Docker Image
+      run: |
+        docker build -t budget-app .
+        docker run --rm aquasec/trivy image budget-app
+
+    - name: Use Secrets
+      run: echo "Secrets loaded successfully"
