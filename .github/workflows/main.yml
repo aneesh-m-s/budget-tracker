@@ -27,7 +27,7 @@ jobs:
     - name: Scan Docker Image
       run: |
         docker build -t budget-app .
-        docker run --rm aquasec/trivy image budget-app
+        docker run --rm aquasec/trivy:0.50.0 image budget-app
 
     - name: Use Secrets
       run: echo "Secrets loaded successfully"
