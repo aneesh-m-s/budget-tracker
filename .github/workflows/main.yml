@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Advanced CI/CD Pipeline
 
 on:
   push:
@@ -16,21 +16,45 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: "18"
 
+      # 🚀 Cache dependencies
+      - name: Cache Node Modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
       - name: Install Dependencies
         run: npm install
 
+      # 🧪 Run tests
       - name: Run Tests
-        run: npm test || echo "No tests found"
+        run: npm test
 
+      # 🔐 Dependency security scan
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+      # 🐳 Build Docker image
       - name: Build Docker Image
         run: docker build -t budget-app .
 
-      - name: Install Trivy (Official Method)
+      # 🔑 Login to DockerHub
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # 📦 Push image
+      - name: Push Docker Image
+        run: |
+          docker tag budget-app ${{ secrets.DOCKER_USERNAME }}/budget-app
+          docker push ${{ secrets.DOCKER_USERNAME }}/budget-app
+
+      # 🔐 Install Trivy
+      - name: Install Trivy
         run: |
           sudo apt-get update
           sudo apt-get install wget apt-transport-https gnupg lsb-release -y
@@ -39,10 +63,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install trivy -y
 
+      # 🔍 Scan container
       - name: Scan Docker Image
         run: |
-          docker build -t budget-app .
-          trivy image --severity HIGH,CRITICAL --scanners vuln budget-app
+          trivy image --severity HIGH,CRITICAL --scanners vuln ${{ secrets.DOCKER_USERNAME }}/budget-app
 
-      - name: Use Secrets
-        run: echo "Secrets are securely loaded"
+      # 🚀 Deploy simulation
+      - name: Deploy
+        run: echo "Deploying application..."
