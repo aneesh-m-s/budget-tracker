@@ -13,7 +13,8 @@ jobs:
       TOKEN: ${{ secrets.TOKEN }}
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
     - name: Install Dependencies
       run: npm install
@@ -24,10 +25,17 @@ jobs:
     - name: Build Docker Image
       run: docker build -t budget-app .
 
+    - name: Install Trivy
+      run: |
+        sudo apt-get update
+        sudo apt-get install wget -y
+        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.50.0_Linux-64bit.deb
+        sudo dpkg -i trivy_0.50.0_Linux-64bit.deb
+
     - name: Scan Docker Image
       run: |
         docker build -t budget-app .
-        docker run --rm aquasec/trivy:0.50.0 image budget-app
+        trivy image --scanners vuln budget-app
 
     - name: Use Secrets
       run: echo "Secrets loaded successfully"
