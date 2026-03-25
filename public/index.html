@@ -1,16 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Budget Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>Budget Tracker</h1>
+  <div class="bg-shape bg-a"></div>
+  <div class="bg-shape bg-b"></div>
 
-  <input id="text" placeholder="Description">
-  <input id="amount" placeholder="Amount">
-  <button onclick="addTransaction()">Add</button>
+  <main class="app">
+    <header class="hero">
+      <p class="eyebrow">Personal Finance</p>
+      <h1>Budget Tracker</h1>
+      <p class="subtitle">Track income and expenses, control spending, and keep your monthly plan on target.</p>
+    </header>
 
-  <ul id="list"></ul>
+    <section class="panel controls">
+      <div class="control-group">
+        <label for="monthFilter">Month</label>
+        <input id="monthFilter" type="month">
+      </div>
+      <div class="control-group">
+        <label for="monthlyBudget">Monthly Budget</label>
+        <input id="monthlyBudget" type="number" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="control-group">
+        <label for="currency">Currency</label>
+        <input id="currency" type="text" maxlength="3" placeholder="INR">
+      </div>
+      <button id="saveSettingsBtn" class="btn secondary">Save Settings</button>
+    </section>
+
+    <section class="cards" id="summaryCards">
+      <article class="card">
+        <h2>Income</h2>
+        <p id="incomeValue">0</p>
+      </article>
+      <article class="card">
+        <h2>Expenses</h2>
+        <p id="expenseValue">0</p>
+      </article>
+      <article class="card">
+        <h2>Balance</h2>
+        <p id="balanceValue">0</p>
+      </article>
+      <article class="card">
+        <h2>Budget Left</h2>
+        <p id="budgetLeftValue">0</p>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <h2>Add Transaction</h2>
+        <form id="transactionForm" class="form-grid">
+          <label>
+            Description
+            <input id="description" type="text" required maxlength="80" placeholder="Groceries, Salary, Rent...">
+          </label>
+          <label>
+            Amount
+            <input id="amount" type="number" min="0.01" step="0.01" required placeholder="0.00">
+          </label>
+          <label>
+            Type
+            <select id="type" required>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </label>
+          <label>
+            Category
+            <input id="category" type="text" maxlength="40" required placeholder="Food, Travel, Utilities...">
+          </label>
+          <label>
+            Date
+            <input id="date" type="date" required>
+          </label>
+          <button class="btn" type="submit">Add Transaction</button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <h2>Category Breakdown</h2>
+        <ul id="categoryBreakdown" class="breakdown"></ul>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="table-head">
+        <h2>Transactions</h2>
+        <span id="transactionCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="transactionRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
   <script src="script.js"></script>
 </body>

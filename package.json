@@ -1,9 +1,10 @@
 {
   "name": "budget-tracker",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "npx jest"
+    "start": "node server.js",
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +16,7 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "jest": "^30.3.0"
+    "jest": "^30.3.0",
+    "supertest": "^7.1.1"
   }
 }
