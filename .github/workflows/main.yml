@@ -33,7 +33,7 @@ jobs:
 
       # 🧪 Run tests
       - name: Run Tests
-        run: npx test
+        run: npx jest
 
       # 🔐 Dependency security scan
       - name: Run npm audit
