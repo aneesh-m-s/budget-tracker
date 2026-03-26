@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Budget Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-shape bg-a"></div>
+  <div class="bg-shape bg-b"></div>
+
+  <main class="auth-shell">
+    <section class="auth-card">
+      <p class="eyebrow">Welcome Back</p>
+      <h1>Login</h1>
+      <p class="subtitle">Access your budget dashboard and continue tracking your money.</p>
+
+      <form id="loginForm" class="auth-form">
+        <label>
+          Email
+          <input id="email" type="email" required placeholder="you@example.com">
+        </label>
+        <label>
+          Password
+          <input id="password" type="password" minlength="6" required placeholder="Minimum 6 characters">
+        </label>
+        <button class="btn" type="submit">Login</button>
+      </form>
+
+      <p class="auth-alt">New here? <a href="signup.html">Create an account</a></p>
+      <p id="authMessage" class="auth-message"></p>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+</body>
+</html>

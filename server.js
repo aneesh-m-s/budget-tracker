@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs/promises");
 const path = require("path");
-const { randomUUID } = require("crypto");
+const { randomUUID, randomBytes, scryptSync, timingSafeEqual } = require("crypto");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -10,10 +10,8 @@ const DATA_FILE = process.env.DATA_FILE || DEFAULT_DATA_FILE;
 const DATA_DIR = path.dirname(DATA_FILE);
 
 const DEFAULT_STORE = {
-  budget: {
-    monthly: 0,
-    currency: "INR"
-  },
+  users: [],
+  sessions: [],
   transactions: []
 };
 
@@ -32,14 +30,25 @@ async function ensureStore() {
 async function readStore() {
   await ensureStore();
   const raw = await fs.readFile(DATA_FILE, "utf8");
-  const parsed = JSON.parse(raw || "{}");
+  let parsed;
+
+  try {
+    parsed = JSON.parse(raw || "{}");
+  } catch {
+    const backupFile = path.join(DATA_DIR, `store.corrupt.${Date.now()}.json`);
+    await fs.writeFile(backupFile, raw, "utf8");
+    await writeStore(DEFAULT_STORE);
+    parsed = { ...DEFAULT_STORE };
+  }
+
+  const users = Array.isArray(parsed?.users) ? parsed.users : [];
+  const sessions = Array.isArray(parsed?.sessions) ? parsed.sessions : [];
+  const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
 
   return {
-    budget: {
-      monthly: Number(parsed?.budget?.monthly) || 0,
-      currency: parsed?.budget?.currency || "INR"
-    },
-    transactions: Array.isArray(parsed?.transactions) ? parsed.transactions : []
+    users,
+    sessions,
+    transactions
   };
 }
 
@@ -70,6 +79,55 @@ function sanitizeTransaction(input) {
   };
 }
 
+function sanitizeAuthInput(input) {
+  const name = String(input.name || "").trim();
+  const email = String(input.email || "").trim().toLowerCase();
+  const password = String(input.password || "");
+
+  return { name, email, password };
+}
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hashed = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hashed}`;
+}
+
+function verifyPassword(password, value) {
+  const [salt, hashed] = String(value || "").split(":");
+  if (!salt || !hashed) return false;
+
+  const hashedBuffer = Buffer.from(hashed, "hex");
+  const inputBuffer = scryptSync(password, salt, 64);
+  if (hashedBuffer.length !== inputBuffer.length) return false;
+
+  return timingSafeEqual(hashedBuffer, inputBuffer);
+}
+
+function createSession(store, userId) {
+  const token = randomBytes(32).toString("hex");
+  store.sessions.push({
+    token,
+    userId,
+    createdAt: new Date().toISOString()
+  });
+  return token;
+}
+
+function toPublicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    monthlyBudget: Number(user.monthlyBudget || 0),
+    currency: user.currency || "INR"
+  };
+}
+
 function byRecentDate(a, b) {
   return new Date(b.date) - new Date(a.date);
 }
@@ -85,12 +143,100 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/settings", async (_req, res) => {
+app.post("/api/auth/signup", async (req, res) => {
+  const { name, email, password } = sanitizeAuthInput(req.body || {});
+
+  if (!name || name.length < 2) {
+    return res.status(400).json({ message: "Name must be at least 2 characters." });
+  }
+
+  if (!validateEmail(email)) {
+    return res.status(400).json({ message: "A valid email is required." });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters." });
+  }
+
   const store = await readStore();
-  res.json(store.budget);
+  const exists = store.users.some((user) => user.email === email);
+  if (exists) {
+    return res.status(409).json({ message: "Email is already registered." });
+  }
+
+  const user = {
+    id: randomUUID(),
+    name,
+    email,
+    passwordHash: hashPassword(password),
+    monthlyBudget: 0,
+    currency: "INR",
+    createdAt: new Date().toISOString()
+  };
+
+  store.users.push(user);
+  const token = createSession(store, user.id);
+  await writeStore(store);
+
+  return res.status(201).json({ token, user: toPublicUser(user) });
 });
 
-app.put("/api/settings", async (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = sanitizeAuthInput(req.body || {});
+  const store = await readStore();
+  const user = store.users.find((candidate) => candidate.email === email);
+
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ message: "Invalid email or password." });
+  }
+
+  const token = createSession(store, user.id);
+  await writeStore(store);
+
+  return res.json({ token, user: toPublicUser(user) });
+});
+
+async function requireAuth(req, res, next) {
+  const header = String(req.headers.authorization || "");
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!token) {
+    return res.status(401).json({ message: "Authentication required." });
+  }
+
+  const store = await readStore();
+  const session = store.sessions.find((row) => row.token === token);
+  if (!session) {
+    return res.status(401).json({ message: "Invalid or expired session." });
+  }
+
+  const user = store.users.find((row) => row.id === session.userId);
+  if (!user) {
+    return res.status(401).json({ message: "User not found for session." });
+  }
+
+  req.auth = { token, user, store };
+  return next();
+}
+
+app.get("/api/auth/me", requireAuth, async (req, res) => {
+  res.json({ user: toPublicUser(req.auth.user) });
+});
+
+app.post("/api/auth/logout", requireAuth, async (req, res) => {
+  const store = req.auth.store;
+  store.sessions = store.sessions.filter((row) => row.token !== req.auth.token);
+  await writeStore(store);
+  res.status(204).send();
+});
+
+app.get("/api/settings", requireAuth, async (req, res) => {
+  res.json({
+    monthly: Number(req.auth.user.monthlyBudget || 0),
+    currency: req.auth.user.currency || "INR"
+  });
+});
+
+app.put("/api/settings", requireAuth, async (req, res) => {
   const monthly = Number(req.body.monthly);
   const currency = String(req.body.currency || "INR").trim().toUpperCase();
 
@@ -102,18 +248,24 @@ app.put("/api/settings", async (req, res) => {
     return res.status(400).json({ message: "Currency must be a 3-letter ISO code." });
   }
 
-  const store = await readStore();
-  store.budget = { monthly: Number(monthly.toFixed(2)), currency };
+  const store = req.auth.store;
+  const user = store.users.find((item) => item.id === req.auth.user.id);
+  if (!user) {
+    return res.status(404).json({ message: "User not found." });
+  }
+
+  user.monthlyBudget = Number(monthly.toFixed(2));
+  user.currency = currency;
   await writeStore(store);
 
-  return res.json(store.budget);
+  return res.json({ monthly: user.monthlyBudget, currency: user.currency });
 });
 
-app.get("/api/transactions", async (req, res) => {
+app.get("/api/transactions", requireAuth, async (req, res) => {
   const month = String(req.query.month || "").trim();
-  const store = await readStore();
+  const store = req.auth.store;
 
-  let results = [...store.transactions];
+  let results = store.transactions.filter((t) => t.userId === req.auth.user.id);
   if (month) {
     results = results.filter((t) => t.date.startsWith(month));
   }
@@ -122,15 +274,16 @@ app.get("/api/transactions", async (req, res) => {
   res.json(results);
 });
 
-app.post("/api/transactions", async (req, res) => {
+app.post("/api/transactions", requireAuth, async (req, res) => {
   const parsed = sanitizeTransaction(req.body || {});
   if (parsed.error) {
     return res.status(400).json({ message: parsed.error });
   }
 
-  const store = await readStore();
+  const store = req.auth.store;
   const transaction = {
     id: randomUUID(),
+    userId: req.auth.user.id,
     ...parsed.value,
     createdAt: new Date().toISOString()
   };
@@ -141,14 +294,14 @@ app.post("/api/transactions", async (req, res) => {
   return res.status(201).json(transaction);
 });
 
-app.put("/api/transactions/:id", async (req, res) => {
+app.put("/api/transactions/:id", requireAuth, async (req, res) => {
   const parsed = sanitizeTransaction(req.body || {});
   if (parsed.error) {
     return res.status(400).json({ message: parsed.error });
   }
 
-  const store = await readStore();
-  const index = store.transactions.findIndex((t) => t.id === req.params.id);
+  const store = req.auth.store;
+  const index = store.transactions.findIndex((t) => t.id === req.params.id && t.userId === req.auth.user.id);
 
   if (index === -1) {
     return res.status(404).json({ message: "Transaction not found." });
@@ -164,9 +317,9 @@ app.put("/api/transactions/:id", async (req, res) => {
   return res.json(store.transactions[index]);
 });
 
-app.delete("/api/transactions/:id", async (req, res) => {
-  const store = await readStore();
-  const next = store.transactions.filter((t) => t.id !== req.params.id);
+app.delete("/api/transactions/:id", requireAuth, async (req, res) => {
+  const store = req.auth.store;
+  const next = store.transactions.filter((t) => !(t.id === req.params.id && t.userId === req.auth.user.id));
 
   if (next.length === store.transactions.length) {
     return res.status(404).json({ message: "Transaction not found." });
@@ -177,17 +330,17 @@ app.delete("/api/transactions/:id", async (req, res) => {
   return res.status(204).send();
 });
 
-app.get("/api/summary", async (req, res) => {
-  const store = await readStore();
+app.get("/api/summary", requireAuth, async (req, res) => {
+  const store = req.auth.store;
   const month = monthFilter(String(req.query.month || "").trim(), new Date().toISOString());
   const rows = month
-    ? store.transactions.filter((t) => t.date.startsWith(month))
-    : store.transactions;
+    ? store.transactions.filter((t) => t.userId === req.auth.user.id && t.date.startsWith(month))
+    : store.transactions.filter((t) => t.userId === req.auth.user.id);
 
   const income = rows.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const expense = rows.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const balance = income - expense;
-  const budgetRemaining = store.budget.monthly - expense;
+  const budgetRemaining = Number(req.auth.user.monthlyBudget || 0) - expense;
 
   res.json({
     month,
@@ -196,7 +349,10 @@ app.get("/api/summary", async (req, res) => {
     balance: Number(balance.toFixed(2)),
     budgetRemaining: Number(budgetRemaining.toFixed(2)),
     transactionCount: rows.length,
-    budget: store.budget
+    budget: {
+      monthly: Number(req.auth.user.monthlyBudget || 0),
+      currency: req.auth.user.currency || "INR"
+    }
   });
 });
 

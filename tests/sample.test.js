@@ -12,7 +12,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   const store = {
-    budget: { monthly: 50000, currency: "INR" },
+    users: [],
+    sessions: [],
     transactions: []
   };
   await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf8");
@@ -22,8 +23,39 @@ afterAll(async () => {
   await fs.rm(tempFile, { force: true });
 });
 
+async function createAuthHeaders() {
+  const signup = await request(app).post("/api/auth/signup").send({
+    name: "Test User",
+    email: "test@example.com",
+    password: "password123"
+  });
+
+  return { Authorization: `Bearer ${signup.body.token}` };
+}
+
+test("signs up and logs in a user", async () => {
+  const signup = await request(app).post("/api/auth/signup").send({
+    name: "Anees",
+    email: "anees@example.com",
+    password: "securepass"
+  });
+
+  expect(signup.status).toBe(201);
+  expect(signup.body.user.email).toBe("anees@example.com");
+
+  const login = await request(app).post("/api/auth/login").send({
+    email: "anees@example.com",
+    password: "securepass"
+  });
+
+  expect(login.status).toBe(200);
+  expect(login.body.token).toBeTruthy();
+});
+
 test("creates and lists transactions", async () => {
-  const create = await request(app).post("/api/transactions").send({
+  const auth = await createAuthHeaders();
+
+  const create = await request(app).post("/api/transactions").set(auth).send({
     description: "Salary",
     amount: 90000,
     type: "income",
@@ -37,13 +69,15 @@ test("creates and lists transactions", async () => {
     type: "income"
   });
 
-  const list = await request(app).get("/api/transactions?month=2026-03");
+  const list = await request(app).get("/api/transactions?month=2026-03").set(auth);
   expect(list.status).toBe(200);
   expect(list.body).toHaveLength(1);
 });
 
 test("updates and deletes a transaction", async () => {
-  const create = await request(app).post("/api/transactions").send({
+  const auth = await createAuthHeaders();
+
+  const create = await request(app).post("/api/transactions").set(auth).send({
     description: "Groceries",
     amount: 3000,
     type: "expense",
@@ -52,7 +86,7 @@ test("updates and deletes a transaction", async () => {
   });
 
   const id = create.body.id;
-  const update = await request(app).put(`/api/transactions/${id}`).send({
+  const update = await request(app).put(`/api/transactions/${id}`).set(auth).send({
     description: "Groceries Weekly",
     amount: 3200,
     type: "expense",
@@ -63,15 +97,22 @@ test("updates and deletes a transaction", async () => {
   expect(update.status).toBe(200);
   expect(update.body.description).toBe("Groceries Weekly");
 
-  const remove = await request(app).delete(`/api/transactions/${id}`);
+  const remove = await request(app).delete(`/api/transactions/${id}`).set(auth);
   expect(remove.status).toBe(204);
 
-  const list = await request(app).get("/api/transactions?month=2026-03");
+  const list = await request(app).get("/api/transactions?month=2026-03").set(auth);
   expect(list.body).toHaveLength(0);
 });
 
 test("returns monthly summary", async () => {
-  await request(app).post("/api/transactions").send({
+  const auth = await createAuthHeaders();
+
+  await request(app).put("/api/settings").set(auth).send({
+    monthly: 50000,
+    currency: "INR"
+  });
+
+  await request(app).post("/api/transactions").set(auth).send({
     description: "Freelance",
     amount: 12000,
     type: "income",
@@ -79,7 +120,7 @@ test("returns monthly summary", async () => {
     date: "2026-03-05"
   });
 
-  await request(app).post("/api/transactions").send({
+  await request(app).post("/api/transactions").set(auth).send({
     description: "Rent",
     amount: 15000,
     type: "expense",
@@ -87,7 +128,7 @@ test("returns monthly summary", async () => {
     date: "2026-03-03"
   });
 
-  const summary = await request(app).get("/api/summary?month=2026-03");
+  const summary = await request(app).get("/api/summary?month=2026-03").set(auth);
 
   expect(summary.status).toBe(200);
   expect(summary.body).toMatchObject({

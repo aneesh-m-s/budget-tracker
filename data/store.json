@@ -1,26 +1,15 @@
 {
-  "budget": {
-    "monthly": 15000,
-    "currency": "INR"
-  },
-  "transactions": [
+  "users": [
     {
-      "id": "2fdec76f-4f8a-41f4-a32c-1356afef5a30",
-      "description": "Movie",
-      "category": "Entertainment",
-      "type": "expense",
-      "amount": 500,
-      "date": "2026-03-25",
-      "createdAt": "2026-03-25T15:48:05.712Z"
-    },
-    {
-      "id": "fe83c60e-4b48-4edf-a918-1ab7d3f25df1",
-      "description": "Salary",
-      "category": "Salary",
-      "type": "income",
-      "amount": 50000,
-      "date": "2026-03-25",
-      "createdAt": "2026-03-25T15:48:38.127Z"
+      "id": "7182556f-5d61-45b8-a211-0dded56bb50b",
+      "name": "Aneesh",
+      "email": "aneeshms1219@gmail.com",
+      "passwordHash": "bdc11d10229dfa1fe0200d2ef33dfa55:2ba274a392a622c2ca13a5bdac8fb076f80c3e1e3fb0ca05f553d61ecf02ca8b2d63487a53a1b8d39e352be130dac387d6322a4b4203a44dcb8844106a72e702",
+      "monthlyBudget": 0,
+      "currency": "INR",
+      "createdAt": "2026-03-26T04:44:34.825Z"
     }
-  ]
+  ],
+  "sessions": [],
+  "transactions": []
 }

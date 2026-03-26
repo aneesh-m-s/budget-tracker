@@ -78,6 +78,24 @@ body {
   line-height: 1.05;
 }
 
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.welcome-user {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .eyebrow {
   margin: 0;
   color: var(--brand);
@@ -279,6 +297,57 @@ td {
   background: linear-gradient(90deg, #1d7b6c, #2aa58f);
 }
 
+.auth-shell {
+  min-height: calc(100vh - 5rem);
+  display: grid;
+  place-items: center;
+}
+
+.auth-card {
+  width: min(480px, 95vw);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.2rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 18px 35px rgba(31, 42, 68, 0.09);
+}
+
+.auth-card h1 {
+  margin: 0.2rem 0;
+  font-family: "DM Serif Display", serif;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+.auth-alt {
+  margin-top: 0.9rem;
+  color: var(--muted);
+}
+
+.auth-alt a {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.auth-message {
+  min-height: 1.2rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.auth-message.error {
+  color: var(--danger);
+}
+
+.auth-message.success {
+  color: var(--income);
+}
+
 @media (max-width: 920px) {
   .controls,
   .cards {
@@ -295,6 +364,11 @@ td {
   .cards,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-top {
+    align-items: start;
+    flex-direction: column;
   }
 
   body {

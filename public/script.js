@@ -1,7 +1,8 @@
 const state = {
   month: new Date().toISOString().slice(0, 7),
   currency: "INR",
-  transactions: []
+  transactions: [],
+  token: localStorage.getItem("budgetAuthToken") || ""
 };
 
 const el = {
@@ -21,8 +22,15 @@ const el = {
   budgetLeftValue: document.getElementById("budgetLeftValue"),
   transactionRows: document.getElementById("transactionRows"),
   transactionCount: document.getElementById("transactionCount"),
-  categoryBreakdown: document.getElementById("categoryBreakdown")
+  categoryBreakdown: document.getElementById("categoryBreakdown"),
+  welcomeUser: document.getElementById("welcomeUser"),
+  logoutBtn: document.getElementById("logoutBtn")
 };
+
+function redirectToLogin() {
+  localStorage.removeItem("budgetAuthToken");
+  window.location.href = "/login.html";
+}
 
 function formatMoney(value) {
   return new Intl.NumberFormat(undefined, {
@@ -33,14 +41,30 @@ function formatMoney(value) {
 }
 
 async function request(url, options = {}) {
-  const response = await fetch(url, options);
+  const headers = {
+    ...(options.headers || {}),
+    ...(state.token ? { Authorization: `Bearer ${state.token}` } : {})
+  };
+
+  const response = await fetch(url, { ...options, headers });
   if (!response.ok) {
+    if (response.status === 401) {
+      redirectToLogin();
+      return null;
+    }
+
     const err = await response.json().catch(() => ({ message: "Request failed." }));
     throw new Error(err.message || "Request failed.");
   }
 
   if (response.status === 204) return null;
   return response.json();
+}
+
+async function loadCurrentUser() {
+  const result = await request("/api/auth/me");
+  if (!result) return;
+  el.welcomeUser.textContent = `Hi, ${result.user.name}`;
 }
 
 function renderSummary(summary) {
@@ -235,11 +259,23 @@ function attachListeners() {
     state.month = el.monthFilter.value;
     loadDashboard().catch((error) => alert(error.message));
   });
+
+  el.logoutBtn.addEventListener("click", () => {
+    request("/api/auth/logout", { method: "POST" })
+      .catch(() => null)
+      .finally(() => redirectToLogin());
+  });
 }
 
 async function init() {
+  if (!state.token) {
+    redirectToLogin();
+    return;
+  }
+
   el.monthFilter.value = state.month;
   el.date.value = new Date().toISOString().slice(0, 10);
+  await loadCurrentUser();
   await loadSettings();
   await loadDashboard();
   attachListeners();
