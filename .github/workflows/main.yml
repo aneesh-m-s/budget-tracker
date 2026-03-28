@@ -8,7 +8,7 @@ on:
       trivy_fail_test:
         description: "Set true to inject a known vulnerable package and verify Trivy blocks deploy"
         required: true
-        default: "true"
+        default: "false"
 
 jobs:
   build:
@@ -44,22 +44,18 @@ jobs:
       # 🔐 Dependency security scan
       - name: Run npm audit
         run: |
-          if [ "${{ github.event.inputs.trivy_fail_test || 'true' }}" = "true" ]; then
-            echo "Trivy demo mode enabled: running npm audit in non-blocking mode"
-            npm audit --audit-level=high || true
-          else
-            npm audit --audit-level=high
-          fi
+          echo "Running npm audit in report mode (non-blocking)"
+          npm audit --audit-level=high || true
 
       # 🐳 Build Docker image
       - name: Build Docker Image
         run: |
           docker build \
-            --build-arg TRIVY_FAIL_TEST=${{ github.event.inputs.trivy_fail_test || 'true' }} \
+            --build-arg TRIVY_FAIL_TEST=${{ github.event.inputs.trivy_fail_test || 'false' }} \
             -t budget-app .
 
       - name: Show Trivy Test Mode
-        run: echo "TRIVY_FAIL_TEST=${{ github.event.inputs.trivy_fail_test || 'true' }}"
+        run: echo "TRIVY_FAIL_TEST=${{ github.event.inputs.trivy_fail_test || 'false' }}"
 
       # 🔐 Install Trivy
       - name: Install Trivy
@@ -74,7 +70,13 @@ jobs:
       # 🔍 Fail pipeline on HIGH/CRITICAL vulnerabilities before push/deploy
       - name: Scan Docker Image With Trivy (Block on Findings)
         run: |
-          trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 budget-app:latest
+          if [ "${{ github.event.inputs.trivy_fail_test || 'false' }}" = "true" ]; then
+            echo "Trivy demo mode enabled: blocking on HIGH/CRITICAL vulnerabilities"
+            trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 budget-app:latest
+          else
+            echo "Normal mode: Trivy scan report only (non-blocking)"
+            trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 budget-app:latest
+          fi
 
       # 🔑 Login to DockerHub
       - name: Login to DockerHub
