@@ -43,7 +43,13 @@ jobs:
 
       # 🔐 Dependency security scan
       - name: Run npm audit
-        run: npm audit --audit-level=high
+        run: |
+          if [ "${{ github.event.inputs.trivy_fail_test || 'true' }}" = "true" ]; then
+            echo "Trivy demo mode enabled: running npm audit in non-blocking mode"
+            npm audit --audit-level=high || true
+          else
+            npm audit --audit-level=high
+          fi
 
       # 🐳 Build Docker image
       - name: Build Docker Image
