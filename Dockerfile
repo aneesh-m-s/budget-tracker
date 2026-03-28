@@ -3,6 +3,8 @@ FROM node:18 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
+ARG TRIVY_FAIL_TEST=false
+RUN if [ "$TRIVY_FAIL_TEST" = "true" ]; then npm install --no-save jsonwebtoken@8.5.1; fi
 COPY . .
 
 # Production stage
